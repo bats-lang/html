@@ -44,7 +44,7 @@ implement get_result{n}(len) = $B.xml_result(len)
 implement opcode{lb}{n}{p}(buf, pos) =
   byte2int0($A.read<byte>(buf, pos))
 
-fun _peek{lb:agz}{n:pos}
+fn _peek{lb:agz}{n:pos}
   (buf: !$A.borrow(byte, lb, n), off: int, len: int n): int = let
   val off1 = g1ofg0(off)
 in
