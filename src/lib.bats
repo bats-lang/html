@@ -25,17 +25,17 @@
 #pub fun element_open
   {lb:agz}{n:pos}{p:nat | p < n}
   (buf: !$A.borrow(byte, lb, n), pos: int p, len: int n)
-  : @(int, int, int, int)
+  : $R.option(@(int, int, int, int))
 
 #pub fun read_attr
   {lb:agz}{n:pos}{p:nat | p < n}
   (buf: !$A.borrow(byte, lb, n), pos: int p, len: int n)
-  : @(int, int, int, int, int)
+  : $R.option(@(int, int, int, int, int))
 
 #pub fun read_text
   {lb:agz}{n:pos}{p:nat | p < n}
   (buf: !$A.borrow(byte, lb, n), pos: int p, len: int n)
-  : @(int, int, int)
+  : $R.option(@(int, int, int))
 
 implement parse_html{lb}{n}(html, len) = let
   val byte_length = $B.xml_parse(html, len)
@@ -70,10 +70,10 @@ in
     val attr_count = _peek(buf, after_tag, len)
   in
     if attr_count >= 0 then
-      @(tag_off, tag_len, attr_count, after_tag + 1)
-    else @(0, 0, 0, ~1)
+      $R.some(@(tag_off, tag_len, attr_count, after_tag + 1))
+    else $R.none()
   end
-  else @(0, 0, 0, ~1)
+  else $R.none()
 end
 
 implement read_attr{lb}{n}{p}(buf, pos, len) = let
@@ -90,11 +90,11 @@ in
       if val_hi >= 0 then let
         val val_len = val_lo + val_hi * 256
         val val_off = after_name + 2
-      in @(name_off, name_len, val_off, val_len, val_off + val_len) end
-      else @(0, 0, 0, 0, ~1)
-    else @(0, 0, 0, 0, ~1)
+      in $R.some(@(name_off, name_len, val_off, val_len, val_off + val_len)) end
+      else $R.none()
+    else $R.none()
   end
-  else @(0, 0, 0, 0, ~1)
+  else $R.none()
 end
 
 implement read_text{lb}{n}{p}(buf, pos, len) = let
@@ -106,7 +106,7 @@ in
     if hi >= 0 then let
       val text_len = lo + hi * 256
       val text_off = p0 + 3
-    in @(text_off, text_len, text_off + text_len) end
-    else @(0, 0, ~1)
-  else @(0, 0, ~1)
+    in $R.some(@(text_off, text_len, text_off + text_len)) end
+    else $R.none()
+  else $R.none()
 end
