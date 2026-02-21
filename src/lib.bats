@@ -4,10 +4,11 @@
 
 #use array as A
 #use wasm.bats-packages.dev/bridge as B
+#use result as R
 
 #pub fun parse_html
   {lb:agz}{n:pos}
-  (html: !$A.borrow(byte, lb, n), len: int n): int
+  (html: !$A.borrow(byte, lb, n), len: int n): $R.result(int)
 
 #pub fun get_result
   {n:pos | n <= 1048576}
@@ -36,8 +37,12 @@
   (buf: !$A.borrow(byte, lb, n), pos: int p, len: int n)
   : @(int, int, int)
 
-implement parse_html{lb}{n}(html, len) =
-  $B.xml_parse(html, len)
+implement parse_html{lb}{n}(html, len) = let
+  val byte_length = $B.xml_parse(html, len)
+in
+  if byte_length > 0 then $R.ok(byte_length)
+  else $R.err(0)
+end
 
 implement get_result{n}(len) = $B.xml_result(len)
 
