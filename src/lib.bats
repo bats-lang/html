@@ -8,7 +8,7 @@
 
 #pub fun parse_html
   {lb:agz}{n:pos}
-  (html: !$A.borrow(byte, lb, n), len: int n): $R.result(int)
+  (html: !$A.borrow(byte, lb, n), len: int n): $R.result(int, int)
 
 #pub fun get_result
   {n:pos | n <= 1048576}
