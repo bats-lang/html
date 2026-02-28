@@ -3,6 +3,7 @@
 #include "share/atspre_staload.hats"
 
 #use array as A
+#use arith as AR
 #use wasm.bats-packages.dev/bridge as B
 #use result as R
 
@@ -50,15 +51,12 @@ implement opcode{lb}{n}{p}(buf, pos) =
   byte2int0($A.read<byte>(buf, pos))
 
 fn _peek{lb:agz}{n:pos}
-  (buf: !$A.borrow(byte, lb, n), off: int, len: int n): int = let
-  val off1 = g1ofg0(off)
-in
-  if off1 >= 0 then
-    if off1 < len then
-      byte2int0($A.read<byte>(buf, off1))
+  (buf: !$A.borrow(byte, lb, n), off: int, len: int n): int =
+  if off >= 0 then
+    if off < g0ofg1(len) then
+      byte2int0($A.read<byte>(buf, $AR.checked_idx(off, len)))
     else ~1
   else ~1
-end
 
 implement element_open{lb}{n}{p}(buf, pos, len) = let
   val p0 : int = g0ofg1(pos)
