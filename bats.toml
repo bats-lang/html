@@ -1,3 +1,9 @@
 [package]
 name = "wasm.bats-packages.dev/html"
 kind = "lib"
+
+[dependencies]
+"arith" = ""
+"array" = ""
+"result" = ""
+"wasm.bats-packages.dev/bridge" = ""
