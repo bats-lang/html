@@ -4,7 +4,7 @@
 
 #use array as A
 #use arith as AR
-#use wasm.bats-packages.dev/bridge as B
+staload XML = "wasm.bats-packages.dev/bridge/src/xml.sats"
 #use result as R
 
 #pub fun parse_html
@@ -39,13 +39,13 @@
   : $R.option(@(int, int, int))
 
 implement parse_html{lb}{n}(html, len) = let
-  val byte_length = $B.xml_parse(html, len)
+  val byte_length = $XML.xml_parse(html, len)
 in
   if byte_length > 0 then $R.ok(byte_length)
   else $R.err(0)
 end
 
-implement get_result{n}(len) = $B.xml_result(len)
+implement get_result{n}(len) = $XML.xml_result(len)
 
 implement opcode{lb}{n}{p}(buf, pos) =
   byte2int0($A.read<byte>(buf, pos))
