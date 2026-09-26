@@ -58,16 +58,18 @@ end (* #target wasm *)
 implement opcode{lb}{n}{p}(buf, pos) =
   byte2int0($A.read<byte>(buf, pos))
 
-fn _peek{lb:agz}{n:pos}
-  (buf: !$A.borrow(byte, lb, n), off: int, len: int n): int =
+(* Byte at off, or ~1 when off is outside the buffer. The two refining
+   comparisons prove the read; the byte comes back as a bounded int, so
+   offsets computed from it stay indexed too. *)
+fn _peek{lb:agz}{n:pos}{o:int}
+  (buf: !$A.borrow(byte, lb, n), off: int o, len: int n): [v:int | v >= ~1; v < 256] int v =
   if off >= 0 then
-    if off < g0ofg1(len) then
-      byte2int0($A.read<byte>(buf, $AR.checked_idx(off, len)))
+    if off < len then $AR.low_byte(byte2int0($A.read<byte>(buf, off)))
     else ~1
   else ~1
 
 implement element_open{lb}{n}{p}(buf, pos, len) = let
-  val p0 : int = g0ofg1(pos)
+  val p0 = pos
   val tag_len = _peek(buf, p0 + 1, len)
 in
   if tag_len >= 0 then let
@@ -83,7 +85,7 @@ in
 end
 
 implement read_attr{lb}{n}{p}(buf, pos, len) = let
-  val p0 : int = g0ofg1(pos)
+  val p0 = pos
   val name_len = _peek(buf, p0, len)
 in
   if name_len >= 0 then let
@@ -104,7 +106,7 @@ in
 end
 
 implement read_text{lb}{n}{p}(buf, pos, len) = let
-  val p0 : int = g0ofg1(pos)
+  val p0 = pos
   val lo = _peek(buf, p0 + 1, len)
   val hi = _peek(buf, p0 + 2, len)
 in
