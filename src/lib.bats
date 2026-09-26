@@ -5,6 +5,7 @@
 #use array as A
 #use arith as AR
 #use result as R
+#use wasm.bats-packages.dev/bridge as B
 
 (* Parsing goes through the browser's DOMParser (bridge's xml host
    functions), so it exists only in WASM builds. The cursor decoders
