@@ -4,8 +4,13 @@
 
 #use array as A
 #use arith as AR
-staload XML = "wasm.bats-packages.dev/bridge/src/xml.sats"
 #use result as R
+
+(* Parsing goes through the browser's DOMParser (bridge's xml host
+   functions), so it exists only in WASM builds. The cursor decoders
+   below are pure and available on every target. *)
+#target wasm begin
+staload XML = "wasm.bats-packages.dev/bridge/src/xml.sats"
 
 #pub fun parse_html
   {lb:agz}{n:pos}
@@ -14,6 +19,7 @@ staload XML = "wasm.bats-packages.dev/bridge/src/xml.sats"
 #pub fun get_result
   {n:pos | n <= 1048576}
   (len: int n): [l:agz] $A.arr(byte, l, n)
+end (* #target wasm *)
 
 #pub stadef ELEMENT_OPEN = 1
 #pub stadef ELEMENT_CLOSE = 2
@@ -38,6 +44,7 @@ staload XML = "wasm.bats-packages.dev/bridge/src/xml.sats"
   (buf: !$A.borrow(byte, lb, n), pos: int p, len: int n)
   : $R.option(@(int, int, int))
 
+#target wasm begin
 implement parse_html{lb}{n}(html, len) = let
   val byte_length = $XML.xml_parse(html, len)
 in
@@ -46,6 +53,7 @@ in
 end
 
 implement get_result{n}(len) = $XML.xml_result(len)
+end (* #target wasm *)
 
 implement opcode{lb}{n}{p}(buf, pos) =
   byte2int0($A.read<byte>(buf, pos))
