@@ -12,14 +12,18 @@
    below are pure and available on every target. *)
 #target wasm begin
 staload XML = "wasm.bats-packages.dev/bridge/src/xml.sats"
+staload BD = "wasm.bats-packages.dev/bridge/src/decompress.sats"
+
+(* The parsed document, SAX-encoded (read with opcode, element_open,
+   read_attr and read_text), and its length; none when parsing produced
+   nothing or more than 1 MiB *)
+#pub datavtype parsed =
+  | {l:agz}{k:pos | k <= 1048576} Parsed of ($A.arr(byte, l, k), int k)
+  | NotParsed of ()
 
 #pub fun parse_html
   {lb:agz}{n:pos}
-  (html: !$A.borrow(byte, lb, n), len: int n): $R.result(int, int)
-
-#pub fun get_result
-  {n:pos | n <= 1048576}
-  (len: int n): [l:agz] $A.arr(byte, l, n)
+  (html: !$A.borrow(byte, lb, n), len: int n): parsed
 end (* #target wasm *)
 
 #pub stadef ELEMENT_OPEN = 1
@@ -46,14 +50,20 @@ end (* #target wasm *)
   : $R.option(@(int, int, int))
 
 #target wasm begin
-implement parse_html{lb}{n}(html, len) = let
-  val byte_length = $XML.xml_parse(html, len)
-in
-  if byte_length > 0 then $R.ok(byte_length)
-  else $R.err(0)
-end
-
-implement get_result{n}(len) = $XML.xml_result(len)
+implement parse_html{lb}{n}(html, len) =
+  case+ $XML.xml_parse(html, len) of
+  | ~$R.none() => NotParsed()
+  | ~$R.some(b) => let
+      val k = $BD.blob_len(b)
+    in
+      if k <= 0 then let val () = $BD.blob_free(b) in NotParsed() end
+      else if k > 1048576 then let val () = $BD.blob_free(b) in NotParsed() end
+      else let
+        val buf = $A.alloc<byte>(k)
+        val () = $BD.blob_read(b, 0, buf, k)
+        val () = $BD.blob_free(b)
+      in Parsed(buf, k) end
+    end
 end (* #target wasm *)
 
 implement opcode{lb}{n}{p}(buf, pos) =
