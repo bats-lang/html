@@ -1,0 +1,5 @@
+attributes: <p class=a data-n=1>hi</>
+script inside: <div>ok</>
+dropped subtree: <b>out</>
+all dropped: nothing
+cut short: <i>whole</>
