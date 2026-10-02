@@ -41,13 +41,18 @@ staload BD = "wasm.bats-packages.dev/bridge/src/decompress.sats"
   (html: !$A.borrow(byte, lb, n), len: int n): parsed
 end (* #target wasm *)
 
-#pub stadef ELEMENT_OPEN = 1
-#pub stadef ELEMENT_CLOSE = 2
-#pub stadef TEXT = 3
+(* What the record at a position of the stream is. The stream writes
+   each as a byte, 1, 2 or 3, which opcode reads; any other byte is not
+   a record (the stream ends there) *)
+#pub datatype record_kind =
+  | ElementOpen
+  | ElementClose
+  | Text
+  | NotARecord
 
 #pub fun opcode
   {lb:agz}{n:pos}{p:nat | p < n}
-  (buf: !$A.borrow(byte, lb, n), pos: int p): int
+  (buf: !$A.borrow(byte, lb, n), pos: int p): record_kind
 
 #pub fun element_open
   {lb:agz}{n:pos}{p:nat | p < n}
@@ -85,69 +90,52 @@ implement parse_html{lb}{n}(html, len) =
     end
 end (* #target wasm *)
 
+(* The kind a record's first byte names: the one place the stream's
+   numbers for them are read *)
+fn _record_kind (code: int): record_kind =
+  if code = 1 then ElementOpen()
+  else if code = 2 then ElementClose()
+  else if code = 3 then Text()
+  else NotARecord()
+
 implement opcode{lb}{n}{p}(buf, pos) =
-  byte2int0($A.read<byte>(buf, pos))
+  _record_kind(byte2int0($A.read<byte>(buf, pos)))
 
-(* Byte at off, or ~1 when off is outside the buffer. The two refining
-   comparisons prove the read; the byte comes back as a bounded int, so
-   offsets computed from it stay indexed too. *)
-fn _peek{lb:agz}{n:pos}{o:int}
-  (buf: !$A.borrow(byte, lb, n), off: int o, len: int n): [v:int | v >= ~1; v < 256] int v =
-  if off >= 0 then
-    if off < len then $AR.low_byte(byte2int0($A.read<byte>(buf, off)))
-    else ~1
-  else ~1
+(* The byte at off, which is inside the buffer, as a bounded int, so
+   offsets computed from it stay indexed too *)
+fn _byte{lb:agz}{n:pos}{o:nat | o < n}
+  (buf: !$A.borrow(byte, lb, n), off: int o): [v:nat | v < 256] int v =
+  $AR.low_byte(byte2int0($A.read<byte>(buf, off)))
 
-implement element_open{lb}{n}{p}(buf, pos, len) = let
-  val p0 = pos
-  val tag_len = _peek(buf, p0 + 1, len)
-in
-  if tag_len >= 0 then let
-    val tag_off = p0 + 2
+implement element_open{lb}{n}{p}(buf, pos, len) =
+  if pos + 1 >= len then $R.none()
+  else let
+    val tag_len = _byte(buf, pos + 1)
+    val tag_off = pos + 2
     val after_tag = tag_off + tag_len
-    val attr_count = _peek(buf, after_tag, len)
   in
-    if attr_count >= 0 then
-      $R.some(@(tag_off, tag_len, attr_count, after_tag + 1))
-    else $R.none()
+    if after_tag >= len then $R.none()
+    else $R.some(@(tag_off, tag_len, _byte(buf, after_tag), after_tag + 1))
   end
-  else $R.none()
-end
 
 implement read_attr{lb}{n}{p}(buf, pos, len) = let
-  val p0 = pos
-  val name_len = _peek(buf, p0, len)
+  val name_len = _byte(buf, pos)
+  val name_off = pos + 1
+  val after_name = name_off + name_len
 in
-  if name_len >= 0 then let
-    val name_off = p0 + 1
-    val after_name = name_off + name_len
-    val val_lo = _peek(buf, after_name, len)
-    val val_hi = _peek(buf, after_name + 1, len)
-  in
-    if val_lo >= 0 then
-      if val_hi >= 0 then let
-        val val_len = val_lo + val_hi * 256
-        val val_off = after_name + 2
-      in $R.some(@(name_off, name_len, val_off, val_len, val_off + val_len)) end
-      else $R.none()
-    else $R.none()
-  end
-  else $R.none()
+  if after_name + 1 >= len then $R.none()
+  else let
+    val val_len = _byte(buf, after_name) + _byte(buf, after_name + 1) * 256
+    val val_off = after_name + 2
+  in $R.some(@(name_off, name_len, val_off, val_len, val_off + val_len)) end
 end
 
-implement read_text{lb}{n}{p}(buf, pos, len) = let
-  val p0 = pos
-  val lo = _peek(buf, p0 + 1, len)
-  val hi = _peek(buf, p0 + 2, len)
-in
-  if lo >= 0 then
-    if hi >= 0 then let
-      val text_len = lo + hi * 256
-      val text_off = p0 + 3
-    in $R.some(@(text_off, text_len, text_off + text_len)) end
-    else $R.none()
-  else $R.none()
-end
+implement read_text{lb}{n}{p}(buf, pos, len) =
+  if pos + 2 >= len then $R.none()
+  else let
+    val text_len = _byte(buf, pos + 1) + _byte(buf, pos + 2) * 256
+    val text_off = pos + 3
+  in $R.some(@(text_off, text_len, text_off + text_len)) end
 
 (* ============================================================
    Sanitizing: a walk over the raw stream, writing what is kept to out.
@@ -256,16 +244,15 @@ fun _walk {lb,lo:agz}{n:pos}{i,o:nat | o <= i; i <= n}{skip:nat} .<n - i, 1>.
   (raw: !$A.borrow(byte, lb, n), out: !$A.arr(byte, lo, n), n: int n,
    i: int i, o: int o, skip: int skip): [w:nat | w <= n] int w =
   if i >= n then o
-  else let
-    val record_kind = _at(raw, i)
-  in
-    if record_kind = 1 then _element(raw, out, n, i, o, skip)
-    else if record_kind = 2 then
+  else
+    case+ _record_kind(_at(raw, i)) of
+    | ElementOpen() => _element(raw, out, n, i, o, skip)
+    | ElementClose() =>
       (if skip > 0 then _walk(raw, out, n, i + 1, o, skip - 1)
        else let
-         val () = $A.set<byte>(out, o, $A.int2byte(2))
+         val () = $A.set<byte>(out, o, $A.read<byte>(raw, i))
        in _walk(raw, out, n, i + 1, o + 1, skip) end)
-    else if record_kind = 3 then
+    | Text() =>
       (if i + 3 > n then o
        else let
          val text_len = _at(raw, i + 1) + 256 * _at(raw, i + 2)
@@ -276,8 +263,7 @@ fun _walk {lb,lo:agz}{n:pos}{i,o:nat | o <= i; i <= n}{skip:nat} .<n - i, 1>.
            val () = _copy(raw, out, i, o, 3 + text_len, 0)
          in _walk(raw, out, n, i + 3 + text_len, o + 3 + text_len, skip) end
        end)
-    else o (* not a record: the stream ends here *)
-  end
+    | NotARecord() => o (* the stream ends here *)
 
 (* An element opening at raw[i]: [1][tag length][tag][attribute count]
    [attributes]. Kept, its head and kept attributes are written with

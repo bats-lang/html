@@ -13,9 +13,22 @@ HTML parsing for [Bats](https://github.com/bats-lang) WASM applications.
 ```bats
 #use wasm.bats-packages.dev/html as H
 
-val () = $H.parse_html(src_bv, src_len)
-val kind = $H.get_result(idx, buf, buf_len)
+case+ $H.parse_html(src_bv, src_len) of
+| ~$H.Parsed(document, k) => let
+    val @(frozen, doc) = $A.freeze<byte>(document)
+    val () = (case+ $H.opcode(doc, 0) of
+      | $H.ElementOpen() => ... (* $H.element_open(doc, 0, k) *)
+      | $H.ElementClose() => ...
+      | $H.Text() => ...       (* $H.read_text(doc, 0, k) *)
+      | $H.NotARecord() => ...)
+    ...
+  end
+| ~$H.NotParsed() => ...
 ```
+
+A record's kind is `record_kind` (`ElementOpen | ElementClose | Text |
+NotARecord`), decoded from the stream's byte by `opcode`; match it with
+`case+`.
 
 ## Sanitizing
 

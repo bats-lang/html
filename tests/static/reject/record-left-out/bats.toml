@@ -1,0 +1,7 @@
+[package]
+name = "record-left-out"
+kind = "lib"
+
+[dependencies]
+"array" = ""
+"wasm.bats-packages.dev/html" = ""
