@@ -1,0 +1,7 @@
+[package]
+name = "opcode-as-int"
+kind = "lib"
+
+[dependencies]
+"array" = ""
+"wasm.bats-packages.dev/html" = ""

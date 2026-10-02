@@ -47,13 +47,12 @@ fun print_attributes {lb:agz}{n:pos}{i:nat | i <= n}{count:nat} .<count>.
 fun print_stream {lb:agz}{n:pos}{i:nat | i <= n} .<n - i>.
   (buf: !$A.borrow(byte, lb, n), n: int n, i: int i): void =
   if i >= n then ()
-  else let
-    val kind = byte_at(buf, i)
-  in
-    if kind = 2 then let
+  else
+    case+ $H.opcode(buf, i) of
+    | $H.ElementClose() => let
         val () = print_string("</>")
       in print_stream(buf, n, i + 1) end
-    else if kind = 3 then
+    | $H.Text() =>
       (if i + 3 > n then print_string("[cut]")
        else let
          val text_len = byte_at(buf, i + 1) + 256 * byte_at(buf, i + 2)
@@ -63,7 +62,7 @@ fun print_stream {lb:agz}{n:pos}{i:nat | i <= n} .<n - i>.
            val () = print_span(buf, i + 3, text_len, 0)
          in print_stream(buf, n, i + 3 + text_len) end
        end)
-    else if kind = 1 then
+    | $H.ElementOpen() =>
       (if i + 2 > n then print_string("[cut]")
        else let
          val tag_len = byte_at(buf, i + 1)
@@ -76,8 +75,7 @@ fun print_stream {lb:agz}{n:pos}{i:nat | i <= n} .<n - i>.
            val () = print_string(">")
          in print_stream(buf, n, next) end
        end)
-    else print_string("[?]")
-  end
+    | $H.NotARecord() => print_string("[?]")
 
 fn show {n:pos | n <= 1048576} (name: string, raw: [l:agz] $A.arr(byte, l, n), n: int n): void = let
   val @(frozen, borrowed) = $A.freeze<byte>(raw)
