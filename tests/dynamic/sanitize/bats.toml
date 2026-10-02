@@ -1,0 +1,11 @@
+[package]
+name = "sanitize"
+kind = "bin"
+
+[dependencies]
+"array" = ""
+"arith" = ""
+"result" = ""
+"str" = ""
+"wasm.bats-packages.dev/bridge" = ""
+"wasm.bats-packages.dev/html" = ""
